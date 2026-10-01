@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Forge Depths</title>
+  <meta name="description" content="A free pixel roguelike in your browser: eight procedural depths, field of view, monsters that hunt you, a daily seed everyone shares, replays, and a chiptune soundtrack.">
+  <meta name="theme-color" content="#0b0910">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="preload" href="fonts/vt323.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <!-- title screen: the bot plays a run behind the menu -->
+  <section class="title-screen" id="title">
+    <canvas id="attract" aria-hidden="true"></canvas>
+    <div class="title-card">
+      <h1>Forge Depths</h1>
+      <p class="tagline">Eight depths down, the Ember Heart still burns.</p>
+      <div class="menu">
+        <button class="btn primary" id="btn-new"><span>New run</span><small>random seed</small></button>
+        <button class="btn" id="btn-daily"><span>Daily run</span><small id="daily-date"></small></button>
+        <button class="btn" id="btn-continue" hidden><span>Continue</span><small id="continue-info"></small></button>
+        <button class="btn" id="btn-seed"><span>Play a seed…</span><small>share a dungeon</small></button>
+      </div>
+      <div class="menu-row">
+        <button class="link" id="btn-scores">Hall of fame</button>
+        <button class="link" id="btn-help-t">How to play</button>
+        <button class="link" id="btn-sprites">Your own sprites</button>
+      </div>
+      <div class="menu-row toggles">
+        <button class="toggle" id="t-music" aria-pressed="true">Music</button>
+        <button class="toggle" id="t-sfx" aria-pressed="true">Sound</button>
+      </div>
+      <p class="credits">Music made with <a href="https://ardakalper.github.io/chiptune-studio/">Chiptune Studio</a> · sprites can be drawn in <a href="https://ardakalper.github.io/pixel-editor/">Pixel Editor</a></p>
+    </div>
+  </section>
+
+  <!-- a run -->
+  <section class="game" id="game" hidden>
+    <div class="viewport" id="viewport">
+      <canvas id="view" aria-label="The dungeon"></canvas>
+      <div class="topbar">
+        <span class="chip" id="run-label"></span>
+        <span class="spacer"></span>
+        <button class="icon-btn" id="b-music" title="Music (m)" aria-pressed="true">♪</button>
+        <button class="icon-btn" id="b-sfx" title="Sound effects" aria-pressed="true">◖</button>
+        <button class="icon-btn" id="b-help" title="Keys (?)">?</button>
+        <button class="icon-btn" id="b-menu" title="Back to the title (your run is saved)">≡</button>
+      </div>
+      <div class="banner" id="banner" hidden><b id="banner-big"></b><span id="banner-small"></span></div>
+      <div class="tip" id="tip" hidden></div>
+      <div class="replay-bar" id="replay-bar" hidden>
+        <span id="replay-info"></span>
+        <button class="icon-btn" id="r-pause" title="Pause (space)">❚❚</button>
+        <button class="icon-btn" data-speed="2">×1</button>
+        <button class="icon-btn" data-speed="8">×4</button>
+        <button class="icon-btn" data-speed="32">×16</button>
+        <button class="icon-btn" id="r-exit" title="Leave the replay">✕</button>
+      </div>
+      <div class="dpad" id="dpad" aria-label="Move">
+        <button data-d="-1,-1">↖</button><button data-d="0,-1">↑</button><button data-d="1,-1">↗</button>
+        <button data-d="-1,0">←</button><button data-d="0,0" title="Wait">·</button><button data-d="1,0">→</button>
+        <button data-d="-1,1">↙</button><button data-d="0,1">↓</button><button data-d="1,1">↘</button>
+      </div>
+    </div>
+
+    <aside class="side">
+      <section class="panel hero-panel">
+        <div class="hero-head"><span class="lv">Lv <b id="lvl">1</b></span><span id="depth-name"></span></div>
+        <div class="bar hp"><i id="hp-fill"></i><span id="hp-text"></span></div>
+        <div class="bar xp"><i id="xp-fill"></i><span id="xp-text"></span></div>
+        <dl class="stats">
+          <div><dt>Damage</dt><dd id="st-dmg"></dd></div>
+          <div><dt>To hit</dt><dd id="st-acc"></dd></div>
+          <div><dt>Armour</dt><dd id="st-def"></dd></div>
+          <div><dt>Gold</dt><dd id="st-gold"></dd></div>
+        </dl>
+      </section>
+      <section class="panel">
+        <h2>Gear</h2>
+        <div class="gear">
+          <div class="slot-big" id="g-weapon"></div>
+          <div class="slot-big" id="g-armour"></div>
+        </div>
+      </section>
+      <section class="panel">
+        <h2>Pack <small>1–0 use · shift drop</small></h2>
+        <ol class="pack" id="pack"></ol>
+      </section>
+      <section class="panel cmds">
+        <button class="key" data-cmd="explore"><kbd>x</kbd>Explore</button>
+        <button class="key" data-cmd="rest"><kbd>r</kbd>Rest</button>
+        <button class="key" data-cmd="pickup"><kbd>g</kbd>Pick up</button>
+        <button class="key" data-cmd="descend"><kbd>&gt;</kbd>Descend</button>
+      </section>
+      <section class="panel map-panel">
+        <canvas id="minimap" aria-label="Map of the explored level"></canvas>
+      </section>
+    </aside>
+
+    <section class="log" id="log" aria-live="polite"></section>
+  </section>
+
+  <div class="popover" id="item-pop" hidden>
+    <b id="pop-name"></b>
+    <p id="pop-text"></p>
+    <div class="row"><button class="btn small primary" id="pop-use">Use</button><button class="btn small" id="pop-drop">Drop</button></div>
+  </div>
+
+  <!-- dialogs -->
+  <dialog id="dlg-over" class="dlg">
+    <h2 id="over-title"></h2>
+    <p class="epitaph" id="over-text"></p>
+    <div class="depths" id="over-depths"></div>
+    <dl class="summary" id="over-stats"></dl>
+    <div class="row wrap">
+      <button class="btn primary" id="o-share">Copy result</button>
+      <button class="btn" id="o-replay">Watch replay</button>
+      <button class="btn" id="o-new">New run</button>
+      <button class="btn" id="o-title">Title</button>
+    </div>
+  </dialog>
+
+  <dialog id="dlg-help" class="dlg wide">
+    <h2>How to play</h2>
+    <p>Find the stairs down on every depth. On the eighth, the Forge Warden guards the Ember Heart: defeat it and pick the Heart up to win. Death is permanent, but the same seed always builds the same dungeon.</p>
+    <div class="cols">
+      <table class="keys">
+        <tr><th>Move / attack</th><td>arrows, numpad, or <kbd>h j k l y u b n</kbd> / <kbd>w a s d q e z c</kbd></td></tr>
+        <tr><th>Wait a turn</th><td><kbd>space</kbd> <kbd>.</kbd> <kbd>5</kbd></td></tr>
+        <tr><th>Explore</th><td><kbd>x</kbd> walks to the nearest unexplored spot or item</td></tr>
+        <tr><th>Rest</th><td><kbd>r</kbd> waits until healed or something shows up</td></tr>
+        <tr><th>Descend</th><td><kbd>&gt;</kbd> or <kbd>enter</kbd> on the stairs</td></tr>
+        <tr><th>Pick up</th><td><kbd>g</kbd></td></tr>
+        <tr><th>Use / drop</th><td><kbd>1</kbd>–<kbd>0</kbd> / <kbd>shift</kbd>+<kbd>1</kbd>–<kbd>0</kbd></td></tr>
+        <tr><th>Travel</th><td>click a tile you have seen; click a monster next to you to attack</td></tr>
+        <tr><th>Music</th><td><kbd>m</kbd></td></tr>
+      </table>
+      <ul class="tips">
+        <li>Monsters see you exactly when you see them. Sleeping ones may wake up as you pass.</li>
+        <li>You cannot move or attack diagonally around a corner or through a doorway. Fight in doorways.</li>
+        <li>Archers and fire imps keep their distance. Close in, or break their line of sight.</li>
+        <li>Badly hurt goblins run, then come back.</li>
+        <li>You heal slowly as you walk. Rest before you open the next door.</li>
+        <li>The daily run is the same dungeon for everyone today.</li>
+      </ul>
+    </div>
+    <div class="row"><button class="btn primary" data-close>Close</button></div>
+  </dialog>
+
+  <dialog id="dlg-scores" class="dlg wide">
+    <h2>Hall of fame</h2>
+    <p class="muted" id="daily-best"></p>
+    <table class="scores"><thead><tr><th>#</th><th>Score</th><th>Result</th><th>Depth</th><th>Lv</th><th>Seed</th><th>Date</th></tr></thead><tbody id="scores-body"></tbody></table>
+    <div class="row"><button class="btn primary" data-close>Close</button></div>
+  </dialog>
+
+  <dialog id="dlg-seed" class="dlg">
+    <h2>Play a seed</h2>
+    <p>Everyone who plays the same seed gets the same dungeon, monsters and items.</p>
+    <form method="dialog" id="seed-form">
+      <input id="seed-input" maxlength="24" spellcheck="false" autocomplete="off" placeholder="e.g. K7QX2M">
+      <div class="row"><button class="btn primary" value="go">Play</button><button class="btn" value="cancel" formnovalidate>Cancel</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="dlg-sprites" class="dlg wide">
+    <h2>Your own sprites</h2>
+    <p>Draw 16×16 frames in <a href="https://ardakalper.github.io/pixel-editor/">Pixel Editor</a> (or Aseprite) and tag each one with the name of the sprite it replaces. Then export a sprite sheet with JSON and pick both files here. Untagged sprites keep their built-in look.</p>
+    <div class="names" id="sprite-names"></div>
+    <div class="row wrap">
+      <label class="file">Sheet JSON <input type="file" id="sp-json" accept=".json,application/json"></label>
+      <label class="file">Sheet PNG <input type="file" id="sp-png" accept="image/png"></label>
+    </div>
+    <p class="muted" id="sp-status"></p>
+    <div class="row wrap">
+      <button class="btn primary" id="sp-apply">Use these sprites</button>
+      <button class="btn" id="sp-clear">Back to the built-in sprites</button>
+      <button class="btn" data-close>Close</button>
+    </div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" hidden></div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
